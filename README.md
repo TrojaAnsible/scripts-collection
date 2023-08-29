@@ -7,7 +7,8 @@ some custom scripts
 
 ### fbsec and fbgetmacaddr
 
-This scripts are from c't magazin.
+This scripts are from c't magazin, slightly modified by me
+
 See ct.de/yju8
 
 * [Fritzbox Tools](https://ct.de/yju8)
