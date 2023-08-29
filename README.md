@@ -5,6 +5,14 @@ some custom scripts
 ### Prerequisites
 
 
+### fbsec and fbgetmacaddr
+
+This scripts are from c't magazin.
+See ct.de/yju8
+
+* [Fritzbox Tools](https://ct.de/yju8)
+
+
 
 ## Author
 
