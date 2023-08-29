@@ -1,0 +1,40 @@
+#!/bin/bash
+
+fritzbox="http://fritz.box:49000"
+
+if [ -z "${1}" ]; then
+  echo usage: ${0} username
+  exit 1
+else
+  usr="${1}"
+fi
+
+service='urn:dslforum-org:service:Hosts:1'
+control="/upnp/control/hosts"
+action='X_AVM-DE_GetHostListPath'
+
+r=$(curl -s -k -m 5 "${fritzbox}${control}" \
+-H 'Content-Type: text/xml; charset="utf-8"' \
+-H "SoapAction:${service}#${action}" \
+-d "<?xml version='1.0' encoding='utf-8'?>\
+<s:Envelope s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/' xmlns:s='http://schemas.xmlsoap.org/soap/envelope/'>\
+<s:Header>\
+<h:InitChallenge xmlns:h='http://soap-authentication.org/digest/2001/10/' s:mustUnderstand='1'>\
+<UserID>${usr}</UserID>\
+</h:InitChallenge>\
+</s:Header>\
+<s:Body>\
+<u:${action} xmlns:u='${service}'></u:${action}>\
+</s:Body>\
+</s:Envelope>")
+
+realm=$(xmlstarlet sel -t -v //Realm <<<${r})
+
+echo "realm: $realm"
+echo "usr  : $usr"
+echo "pwd  : $pwd"
+
+read -r -s -p "Passwort: " pwd || exit 1
+secret=$(echo -n "${usr}:${realm}:${pwd}" | md5sum)
+echo -e "\nsecret = ${secret:0:-3}"
+

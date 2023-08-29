@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+ 
+UTOP=25
+ 
+AWK=/usr/bin/awk
+SORT=/usr/bin/sort
+DU=/usr/bin/du
+TAIL=/usr/bin/tail
+ 
+OLDPWD=`pwd`
+ 
+if [ $# -eq 1 ]; then
+    if [ -d "$1" ]; then
+        cd "$1"
+    fi
+fi
+ 
+$DU -sk * | $SORT -n | $TAIL -${UTOP} \
+| $AWK 'BEGIN {OFMT="%.2f";} {
+    valk=$1/1024;
+    if (valk > 1024)
+	{
+	    val = valk/1024;
+	    eh = "GB";
+	}
+    else
+	{
+	    val = valk;
+	    eh = "MB";
+	}
+     
+    if ($1 < 1024)
+        {
+            val = $1;
+            eh = "KB";
+        }
+ 
+    $1 = "";
+    printf "%8.1f %s %s\n", val,eh, $0 ; }'
+ 
+cd "$OLDPWD"
+ 

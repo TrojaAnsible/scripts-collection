@@ -1,0 +1,86 @@
+#!/bin/bash
+
+FBhost="http://fritz.box:49000"
+FBuser="autofritz"
+FBsec=
+
+if [ -f "$HOME/.fbsec" ]; then
+    FBsec=$(<$HOME/.fbsec)
+else
+    echo "ERROR: missing FB security key in $HOME/.fbsec"
+    echo "       use 'fbsec' to encode password. Download from: ct.de/yju8"
+    exit 2
+fi
+
+
+FBsearch="${1}"
+FBItem="${2:-HostName}"
+
+
+if [ -z "${FBsearch}" ]; then
+  echo "usage: ${0##*/} hostname|IP [ Item ]"
+  printf "\t e.g.: ${0##*/} zeus\n"
+  printf "\t       ${0##*/} 192.168.20.10 IPAddress\n"
+  exit 1
+fi
+
+FBct='Content-Type: text/xml; charset="utf-8"'
+FBsoap="SoapAction:\${FBservice}#\${FBaction}"
+FBenv="<?xml version='1.0' encoding='utf-8'?>\
+<s:Envelope s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/' xmlns:s='http://schemas.xmlsoap.org/soap/envelope/'>\
+\${FBeheader}\
+<s:Body>\
+<u:\${FBaction} xmlns:u='\${FBservice}'></u:\${FBaction}>\
+</s:Body>\
+</s:Envelope>"
+
+FBcontrol="/upnp/control/deviceinfo"
+FBservice='urn:dslforum-org:service:DeviceInfo:1'
+FBaction='GetSecurityPort'
+r=$(curl -s -k -m 5 "${FBhost}${FBcontrol}" -H "${FBct}" -H "${FBsoap@P}" -d "${FBenv@P}")
+
+FBport=$(xmlstarlet sel -t -v //NewSecurityPort <<<${r})
+if [ "${FBport}" ]; then
+  FBhost="${FBhost#*:}"
+  FBhost="${FBhost%:*}"
+  FBhost="https:${FBhost}:${FBport}"
+fi
+
+FBcontrol="/upnp/control/hosts"
+FBservice='urn:dslforum-org:service:Hosts:1'
+FBaction='X_AVM-DE_GetHostListPath'
+
+FBeheader="\
+<s:Header>\
+<h:InitChallenge xmlns:h='http://soap-authentication.org/digest/2001/10/' s:mustUnderstand='1'>\
+<UserID>${FBuser}</UserID>\
+</h:InitChallenge>\
+</s:Header>"
+r=$(curl -s -k -m 5 "${FBhost}${FBcontrol}" -H "${FBct}" -H "${FBsoap@P}" -d "${FBenv@P}")
+
+FBnonce=$(xmlstarlet sel -t -v //Nonce <<<${r})
+FBrealm=$(xmlstarlet sel -t -v //Realm <<<${r})
+FBauth=$(echo -n "${FBsec}:${FBnonce}" | md5sum)
+
+FBeheader="\
+<s:Header>\
+<h:ClientAuth xmlns:h='http://soap-authentication.org/digest/2001/10/' s:mustUnderstand='1'>\
+<Nonce>${FBnonce}</Nonce>\
+<Auth>${FBauth:0:-3}</Auth>\
+<UserID>${FBuser}</UserID>\
+<Realm>${FBrealm}</Realm>\
+</h:ClientAuth>\
+</s:Header>"
+r=$(curl -s -k -m 5 "${FBhost}${FBcontrol}" -H "${FBct}" -H "${FBsoap@P}" -d "${FBenv@P}")
+
+FBstatus=$(xmlstarlet sel -t -v //Status <<<${r})
+if [ "${FBstatus}" != "Authenticated" ]; then
+  echo "Authentication failed: Wrong Username, Password or Realm."
+  exit 1
+fi
+
+FBlua=$(xmlstarlet sel -t -v //NewX_AVM-DE_HostListPath <<<${r})
+
+r=$(curl -s -k -m 5 "${FBhost}${FBlua}")
+xmlstarlet sel -t -m "List/Item[${FBItem}='${FBsearch}']" -v MACAddress -n <<<${r}
+

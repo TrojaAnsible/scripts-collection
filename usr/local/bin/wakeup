@@ -1,0 +1,56 @@
+#!/bin/bash
+
+
+WOL=/usr/bin/wakeonlan
+FBGETADDR=/usr/local/bin/fbgetmacaddr
+
+
+HOST=$1
+
+
+if [ -z "${HOST}" ]; then
+  echo "usage: ${0} [hostname|ipaddr]"
+  exit 1
+fi
+
+
+if [ ! -f "$WOL" ]; then
+    echo "ERROR: $WOL is missing. pls. install"
+    exit 2
+fi
+
+
+if [ ! -f "$FBGETADDR" ]; then
+    echo "ERROR: $FBGETADDR is missing. pls. install"
+    exit 3
+fi
+
+if [[ ${HOST} =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    IS_IP=IPAddress
+fi
+
+ADDRS=$($FBGETADDR $HOST $IS_IP)
+
+
+NR=$(echo $ADDRS | wc -w | bc)
+
+if [ $NR -gt 1 ]; then
+    for i in $ADDRS; do
+	# use Super Micro MAC for zeus
+	if [[ $i =~ 3C:EC:EF ]] && [ "$HOST" = "zeus" -o "$HOST" = "192.168.20.10" ]; then
+	    WAKEUP_MAC=$i
+	else
+	    echo "ignoring MAC $i"
+	fi
+    done
+elif [ $NR -eq 1 ]; then
+    WAKEUP_MAC=$ADDRS
+else
+    echo "WARN: unexpected result: $NR ($ADDRS)"
+fi
+
+if [ -n "$WAKEUP_MAC" ]; then
+    echo "wakeup $WAKEUP_MAC"
+    $WOL $WAKEUP_MAC
+fi
+
